@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earthquake Monitoring Tool</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #map {
+            flex: 1;
+            width: 70%;
+        }
+        .sidebar {
+            width: 30%;
+            background-color: #f8f9fa;
+            padding: 10px;
+            overflow-y: auto;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .sidebar h2 {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+        }
+        .quake-item {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            cursor: pointer;
+        }
+        .quake-item:hover {
+            background-color: #e9ecef;
+        }
+        .map-container {
+            display: flex;
+            flex: 1;
+        }
+        .cross-marker {
+            color: red;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        @media (max-width: 768px) {
+            .map-container {
+                flex-direction: column;
+            }
+            #map {
+                width: 100%;
+                height: 50%;
+            }
+            .sidebar {
+                width: 100%;
+                height: 50%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Earthquake Monitoring Tool</h1>
+    </div>
+    <div class="map-container">
+        <div id="map"></div>
+        <div class="sidebar">
+            <h2>Recent Earthquakes</h2>
+            <div id="quake-list"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        // Initialize the map
+        const map = L.map('map').setView([35, 137], 5);
+
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Function to create a cross marker
+        function createCrossMarker(lat, lng, magnitude) {
+            const color = magnitude >= 5 ? 'red' : magnitude >= 3 ? 'orange' : 'green';
+            const crossIcon = L.divIcon({
+                className: 'cross-marker',
+                html: `<span style="color: ${color};">&#10006;</span>`,
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+            return L.marker([lat, lng], { icon: crossIcon });
+        }
+
+        // Function to fetch earthquake data from P2P Earthquake Information API
+        async function fetchEarthquakeData() {
+            try {
+                const response = await fetch('https://www.p2pquake.net/json'); // P2P Earthquake Information API
+                const data = await response.json();
+
+                const quakeList = document.getElementById('quake-list');
+                quakeList.innerHTML = ''; // Clear the list before updating
+
+                // Process each earthquake
+                data.forEach((quake, index) => {
+                    const { latitude, longitude, mag: magnitude, depth, place } = quake.earthquake;
+
+                    createCrossMarker(latitude, longitude, magnitude).addTo(map)
+                        .bindPopup(`
+                            <strong>Magnitude:</strong> ${magnitude}<br>
+                            <strong>Depth:</strong> ${depth} km<br>
+                            <strong>Location:</strong> ${place}
+                        `);
+
+                    // Add to the sidebar list
+                    const quakeItem = document.createElement('div');
+                    quakeItem.className = 'quake-item';
+                    quakeItem.innerHTML = `
+                        <strong>${place}</strong><br>
+                        Magnitude: ${magnitude}, Depth: ${depth} km
+                    `;
+                    quakeItem.onclick = () => {
+                        map.setView([latitude, longitude], 8);
+                    };
+                    quakeList.appendChild(quakeItem);
+                });
+            } catch (error) {
+                console.error('Error fetching earthquake data:', error);
+            }
+        }
+
+        // Fetch data initially and set interval for updates
+        fetchEarthquakeData();
+        setInterval(fetchEarthquakeData, 60000); // Refresh every 60 seconds
+    </script>
+</body>
+</html>
